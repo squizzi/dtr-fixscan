@@ -70,7 +70,8 @@ def probe():
     logs = api_container.logs().splitlines()
     # Instantiate empty match lists
     matched_digests = []
-    matched_images = []
+    repo_list = []
+    namespace_list = []
     for line in logs:
         if "Unable to make tag scan summary" in line:
             # If we can find the tag scan failure message in the log line pull the
@@ -78,22 +79,31 @@ def probe():
             try:
                 digest = re.search("sha256:[A-Fa-f0-9]{64}", line).group(0)
                 matched_digests.append(digest)
-                image = re.search("\"http.request.uri\":\"\/api\/v0\/repositories\/([^/]*)\/([^/]*)", line).groups(2)
-                matched_images.append(image)
+                image = re.search("image (?:[a-z]+/)?([a-z]+)?", line).group(0)
+                if len(image) > 0:
+                    # If we find an image match extract the namespace and repo
+                    # portion only and get rid of the extra cruft pulled by
+                    # the regex limitation then form two lists to build a dict
+                    # from later
+                    repo_namespace = image.split(' ')[1].split('/')
+                    repo = repo_namespace[0]
+                    namespace = repo_namespace[1]
+                    repo_list.append(repo)
+                    namespace_list.append(namespace)
             except AttributeError:
                 # Skip digests or images that don't match the regex
                 pass
-    # Check len of matched
-    if len(matched_digests + matched_images) <= 0:
-        #logging.info("No corrupted scan data found, exiting")
+    # Check len of lists, we only need to check either repo or namespace here
+    # since there len's should be identical
+    if len(repo_list + matched_images) <= 0:
+        logging.info("No corrupted scan data found, exiting")
         sys.exit(1)
     # Drop the non-unique digests and images then set back to list for iteration
     global images
     global digests
     digests = list(set(matched_digests))
-    images_list = list(set(matched_images))
     # Place image:tag list into a dict of namespace:repository
-    images = dict((r, n) for r, n in images_list)
+    images = dict(zip(repo_list, namespace_list))
     # Log a list of images and digests that are effected
     logging.info("Digests potentially corrupted: {0}".format(digests))
     logging.info("Repository/namespaces potentially corrupted: {0}".format(images))
