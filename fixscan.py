@@ -95,7 +95,7 @@ def probe():
                 pass
     # Check len of lists, we only need to check either repo or namespace here
     # since there len's should be identical
-    if len(repo_list + matched_images) <= 0:
+    if len(repo_list + matched_digests) <= 0:
         logging.info("No corrupted scan data found, exiting")
         sys.exit(1)
     # Drop the non-unique digests and images then set back to list for iteration
