@@ -1,18 +1,16 @@
-FROM ubuntu:16.04
+FROM docker:18-dind
 
 MAINTAINER Kyle Squizzato: 'kyle.squizzato@docker.com'
 
 WORKDIR /
 
-RUN apt-get update -qq && apt-get install -y \
-  curl \
-  python2.7-minimal \
-  python-pip
-RUN curl -sSL https://get.docker.com/ | sh
+RUN apk add --no-cache \
+    curl \
+    python
+RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && python get-pip.py
 RUN pip install --upgrade \
-  pip \
-  logrusformatter \
-  docker
+    logrusformatter \
+    docker
 
 COPY ./fixscan.py /
 
