@@ -85,11 +85,12 @@ def probe():
                     # portion only and get rid of the extra cruft pulled by
                     # the regex limitation then form two lists to build a dict
                     # from later
+                    # Ex. admin/alpine = namespace/repository
                     repo_namespace = image.split(' ')[1].split('/')
-                    repo = repo_namespace[0]
-                    namespace = repo_namespace[1]
-                    repo_list.append(repo)
+                    namespace = repo_namespace[0]
+                    repo = repo_namespace[1]
                     namespace_list.append(namespace)
+                    repo_list.append(repo)
             except AttributeError:
                 # Skip digests or images that don't match the regex
                 pass
@@ -103,7 +104,7 @@ def probe():
     global digests
     digests = list(set(matched_digests))
     # Place image:tag list into a dict of namespace:repository
-    images = dict(zip(repo_list, namespace_list))
+    images = dict(zip(namespace_list, repo_list))
     # Log a list of images and digests that are effected
     logging.info("Digests potentially corrupted: {0}".format(digests))
     logging.info("Repository/namespaces potentially corrupted: {0}".format(images))
@@ -144,8 +145,8 @@ def clean():
     # Clean images
     # Iterate through the images dict and clean n (namespace) r (repository)
     # with relevant reql
-    for r, n in images.items():
-        logging.debug("Cleaning {0}/{1}".format(r, n))
+    for n, r in images.items():
+        logging.debug("Cleaning {0}/{1}".format(n, r))
         # FIXME: This is hacky, use docker-py
         command = "r.db('dtr2').table('scanned_images').filter('{{\"repository\":\"{0}\",\"namespace\":\"{1}\"}}').delete()".format(r, n)
         try:
