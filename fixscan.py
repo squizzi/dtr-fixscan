@@ -79,7 +79,7 @@ def probe():
             try:
                 digest = re.search("sha256:[A-Fa-f0-9]{64}", line).group(0)
                 matched_digests.append(digest)
-                image = re.search("image (?:[a-z]+/)?([a-z]+)?", line).group(0)
+                image = re.search("image (?:[a-zA-Z0-9_-]+\/)?([a-zA-Z0-9_-]+)?", line).group(0)
                 if len(image) > 0:
                     # If we find an image match extract the namespace and repo
                     # portion only and get rid of the extra cruft pulled by
@@ -87,8 +87,11 @@ def probe():
                     # from later
                     # Ex. admin/alpine = namespace/repository
                     repo_namespace = image.split(' ')[1].split('/')
-                    namespace = repo_namespace[0]
-                    repo = repo_namespace[1]
+                    try:
+                        namespace = repo_namespace[0]
+                        repo = repo_namespace[1]
+                    except IndexError as e:
+                        logging.error("Unable to construct scan failure data: {0}".format(e))
                     namespace_list.append(namespace)
                     repo_list.append(repo)
             except AttributeError:
