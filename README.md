@@ -20,5 +20,5 @@ metadata.
 2. Find and clean corrupted scanning metadata with the `dtr-fixscan` image:
 
 ~~~
-docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock squizzi/dtr-fixscan:v2.5.4+
+docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock squizzi/dtr-fixscan:v2.5.4
 ~~~
