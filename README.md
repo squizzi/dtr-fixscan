@@ -1,5 +1,5 @@
 # Fix corrupted DTR scanning
-This script should only be ran on Docker Trusted Registry 2.5.x as a workaround
+This script should only be ran on Docker Trusted Registry 2.5.4+ as a workaround
 to help resolve a known issue with corrupted DTR scanning metadata.  Do not run
 this script unless advised by a member of Docker Support.
 
@@ -20,5 +20,5 @@ metadata.
 2. Find and clean corrupted scanning metadata with the `dtr-fixscan` image:
 
 ~~~
-docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock squizzi/dtr-fixscan
+docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock squizzi/dtr-fixscan:v2.5.4+
 ~~~

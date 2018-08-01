@@ -50,6 +50,21 @@ def check_for_delete(reql_result):
         return False
 
 """
+Check to ensure the dockerhubenterprise/rethinkcli non-interactive image is
+present and obtainable
+"""
+def check_for_rethinkcli():
+    # Check to see if dockerhubenterprise/rethinkcli:v2.2.0-ni is present by
+    # pulling the image, if we can't fetch it assume disconnected.
+    try:
+        # Pull the image
+        cli.images.pull("dockerhubenterprise/rethinkcli", tag="v2.2.0-ni")
+    except docker.errors.APIError as e:
+        logging.error("Unable to pull rethinkcli image: {0}".format(e))
+        logging.info("Cannot continue without rethinkcli image -- If you are running in a disconnected environment please 'docker load' the dockerhubenterprise/rethinkcli:v2.2.0-ni image")
+        sys.exit(1)
+
+"""
 Probe determine's which digests and repository namespaces are potentially
 corrupted by scanning the dtr-api logs from the host where this script is ran.
 It creates two new global vars for images and digests found.
@@ -136,8 +151,9 @@ def clean():
         logging.debug("Cleaning digest: {0}".format(digest))
         # FIXME: This is hacky, use docker-py
         command = "r.db('dtr2').table('scanned_layers').filter({{'digest':'{0}'}}).delete()".format(digest)
+        dtr_replica_id = "docker ps -lf name='^/dtr-rethinkdb-.{12}$' --format '{{.Names}}' | cut -d- -f3"
         try:
-            reql_result = subprocess.check_output("echo \"{0}\" | docker exec -i $(docker ps -lqf name=dtr-rethinkdb) rethinkcli non-interactive".format(command),
+            reql_result = subprocess.check_output("echo \"{0}\" | docker run -i --rm --net dtr-ol -e DTR_REPLICA_ID=$({1}) -v dtr-ca-$({1}):/ca dockerhubenterprise/rethinkcli:v2.2.0-ni non-interactive; echo".format(command, dtr_replica_id),
                             shell=True)
             if not check_for_delete(reql_result):
                 logging.debug("digest: {0} has already been cleaned".format(digest))
@@ -152,8 +168,9 @@ def clean():
         logging.debug("Cleaning {0}/{1}".format(n, r))
         # FIXME: This is hacky, use docker-py
         command = "r.db('dtr2').table('scanned_images').filter('{{\"repository\":\"{0}\",\"namespace\":\"{1}\"}}').delete()".format(r, n)
+        dtr_replica_id = "docker ps -lf name='^/dtr-rethinkdb-.{12}$' --format '{{.Names}}' | cut -d- -f3"
         try:
-            reql_result = subprocess.check_output("echo \"{0}\" | docker exec -i $(docker ps -lqf name=dtr-rethinkdb) rethinkcli non-interactive".format(command),
+            reql_result = subprocess.check_output("echo \"{0}\" | docker run -i --rm --net dtr-ol -e DTR_REPLICA_ID=$({1}) -v dtr-ca-$({1}):/ca dockerhubenterprise/rethinkcli:v2.2.0-ni non-interactive; echo".format(command, dtr_replica_id),
                             shell=True)
             if not check_for_delete(reql_result):
                 logging.debug("{0}/{1} has already been cleaned".format(r, n))
@@ -182,6 +199,8 @@ def main():
     hdlr = logging.StreamHandler(sys.stdout)
     hdlr.setFormatter(fmtr)
     logger.addHandler(hdlr)
+    # Check for a rethinkcli image
+    check_for_rethinkcli()
     # Run probe/clean functions
     probe()
     clean()
