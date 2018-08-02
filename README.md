@@ -10,9 +10,12 @@ potentially been created by corrupted DTR scanning metadata and calls relevant
 ReQL (Rethink Query Language) to remove these corrupt entries from the DTR
 metadata database.
 
-**Note**: The script is not intelligent and re-running the script will re-read old
+**Note**: 
+
+* The script is not intelligent and re-running the script will re-read old
 `dtr-api` entries and result in the removal of what it believes may be corrupted
 metadata.
+* This script will not preserve old scanning data, rescanning images will be required once this script has been ran.
 
 1. Perform a [backup of the DTR
    metadata](https://docs.docker.com/ee/dtr/admin/disaster-recovery/create-a-backup/#backup-dtr-metadata)
