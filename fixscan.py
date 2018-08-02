@@ -131,11 +131,12 @@ def probe():
 Clean iterate's over the digests list and images dict to perform cleanup using
 appropriate ReQL commands
 """
-def clean():
+def clean(newly_cleaned_counter=0, already_cleaned_counter=0):
     # Prompt the user that we're about to begin the cleaning process which
     # will attempt to remove scanning data from rethinkdb
     logging.warn("Preparing to clean corrupted scanning data from DTR metadata, this is a potentially dangerous operation, please ensure you've performed a DTR metadata backup before continuing.")
     if not yes_no("Are you sure you wish to continue"):
+        logging.info("Exiting due to user input")
         sys.exit(1)
     # Clean digests
     # Make sure the rethinkdb container is running prior to attempting to use it
@@ -157,8 +158,12 @@ def clean():
                             shell=True)
             if not check_for_delete(reql_result):
                 logging.debug("digest: {0} has already been cleaned".format(digest))
+                already_cleaned_counter += 1
         except subprocess.CalledProcessError as e:
             logging.error("Unable to clean: reql command failed: {0}".format(e))
+        # Increment the newly_cleaned_counter to track cleans that happened
+        # on this session
+        newly_cleaned_counter += 1
     logging.info("Digests cleaned")
     logging.info("Cleaning corrupted repository and namespace metadata...")
     # Clean images
@@ -173,10 +178,22 @@ def clean():
             reql_result = subprocess.check_output("echo \"{0}\" | docker run -i --rm --net dtr-ol -e DTR_REPLICA_ID=$({1}) -v dtr-ca-$({1}):/ca dockerhubenterprise/rethinkcli:v2.2.0-ni non-interactive; echo".format(command, dtr_replica_id),
                             shell=True)
             if not check_for_delete(reql_result):
-                logging.debug("{0}/{1} has already been cleaned".format(r, n))
+                logging.debug("{0}/{1} has already been cleaned".format(n, r))
+                already_cleaned_counter += 1
         except subprocess.CalledProcessError as e:
             logging.error("Unable to clean: reql command failed: {0}".format(e))
+        # Increment the newly_cleaned_counter to track cleans that happen
+        # on this session
+        newly_cleaned_counter += 1
     logging.info("Repositories and namespaces cleaned")
+    # Determine if anything was actually cleaned and log if so
+    logging.debug("Already cleaned: {0}, Newly cleaned: {1}".format(already_cleaned_counter, newly_cleaned_counter))
+    if already_cleaned_counter == newly_cleaned_counter:
+        return 1
+    elif newly_cleaned_counter > already_cleaned_counter:
+        return 2
+    else:
+        return 0
 
 def main():
     # argument parsing
@@ -203,8 +220,14 @@ def main():
     check_for_rethinkcli()
     # Run probe/clean functions
     probe()
-    clean()
-    logging.info("Complete")
+    clean_result = clean()
+    if clean_result is 1:
+        logging.warn("All potentially corrupted data has already been cleaned either manually or in a prior run of this tool, exiting")
+    if clean_result is 2:
+        logging.warn("Some potentially corrupted data had already been cleaned, but newly corrupted data was found and cleaned")
+    if clean_result is 0:
+        logging.info("Complete")
+    sys.exit(0)
 
 """
 Main
