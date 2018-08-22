@@ -43,7 +43,8 @@ def check_for_delete(reql_result):
         deleted_value = re.search('"deleted":[0-9]', reql_result).group(0)
     except AttributeError:
         logging.error("reql result: {0} does not contain a deleted value".format(reql_result))
-        sys.exit(1)
+        # Consider the value possibly not cleaned, but keep going
+        return False
     if deleted_value.split(':')[1] == '1':
         return True
     else:
@@ -136,6 +137,7 @@ def clean():
         logging.debug("Cleaning digest: {0}".format(digest))
         # FIXME: This is hacky, use docker-py
         command = "r.db('dtr2').table('scanned_layers').filter({{'digest':'{0}'}}).delete()".format(digest)
+        logging.debug("Issuing command: {0}".format(command))
         try:
             reql_result = subprocess.check_output("echo \"{0}\" | docker exec -i $(docker ps -lqf name=dtr-rethinkdb) rethinkcli non-interactive".format(command),
                             shell=True)
@@ -152,6 +154,7 @@ def clean():
         logging.debug("Cleaning {0}/{1}".format(n, r))
         # FIXME: This is hacky, use docker-py
         command = "r.db('dtr2').table('scanned_images').filter('{{\"repository\":\"{0}\",\"namespace\":\"{1}\"}}').delete()".format(r, n)
+        logging.debug("Issuing command: {0}".format(command))
         try:
             reql_result = subprocess.check_output("echo \"{0}\" | docker exec -i $(docker ps -lqf name=dtr-rethinkdb) rethinkcli non-interactive".format(command),
                             shell=True)
