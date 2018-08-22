@@ -43,7 +43,8 @@ def check_for_delete(reql_result):
         deleted_value = re.search('"deleted":[0-9]', reql_result).group(0)
     except AttributeError:
         logging.error("reql result: {0} does not contain a deleted value".format(reql_result))
-        sys.exit(1)
+        # Consider the value possibly not cleaned, but keep going
+        return False
     if deleted_value.split(':')[1] == '1':
         return True
     else:
@@ -62,6 +63,9 @@ def check_for_rethinkcli():
     except docker.errors.APIError as e:
         logging.error("Unable to pull rethinkcli image: {0}".format(e))
         logging.info("Cannot continue without rethinkcli image -- If you are running in a disconnected environment please 'docker load' the dockerhubenterprise/rethinkcli:v2.2.0-ni image")
+        sys.exit(1)
+    except requests.exceptions.ConnectionError:
+        logging.error("No docker socket found, was /var/run/docker.sock mounted?")
         sys.exit(1)
 
 """
@@ -153,6 +157,7 @@ def clean(newly_cleaned_counter=0, already_cleaned_counter=0):
         # FIXME: This is hacky, use docker-py
         command = "r.db('dtr2').table('scanned_layers').filter({{'digest':'{0}'}}).delete()".format(digest)
         dtr_replica_id = "docker ps -lf name='^/dtr-rethinkdb-.{12}$' --format '{{.Names}}' | cut -d- -f3"
+        logging.debug("Issuing command: {0} on replica-id: {1}".format(command, dtr_replica_id))
         try:
             reql_result = subprocess.check_output("echo \"{0}\" | docker run -i --rm --net dtr-ol -e DTR_REPLICA_ID=$({1}) -v dtr-ca-$({1}):/ca dockerhubenterprise/rethinkcli:v2.2.0-ni non-interactive; echo".format(command, dtr_replica_id),
                             shell=True)
@@ -174,6 +179,7 @@ def clean(newly_cleaned_counter=0, already_cleaned_counter=0):
         # FIXME: This is hacky, use docker-py
         command = "r.db('dtr2').table('scanned_images').filter('{{\"repository\":\"{0}\",\"namespace\":\"{1}\"}}').delete()".format(r, n)
         dtr_replica_id = "docker ps -lf name='^/dtr-rethinkdb-.{12}$' --format '{{.Names}}' | cut -d- -f3"
+        logging.debug("Issuing command: {0} on replica-id: {1}".format(command, dtr_replica_id))
         try:
             reql_result = subprocess.check_output("echo \"{0}\" | docker run -i --rm --net dtr-ol -e DTR_REPLICA_ID=$({1}) -v dtr-ca-$({1}):/ca dockerhubenterprise/rethinkcli:v2.2.0-ni non-interactive; echo".format(command, dtr_replica_id),
                             shell=True)
@@ -204,6 +210,11 @@ def main():
                         dest="debug",
                         action="store_true",
                         help="Enable debug logging")
+    parser.add_argument("--no-image-check",
+                        dest="no_image_check",
+                        action="store_true",
+                        help="Disable automatic image checking and pulling \
+                        for the RethinkCLI image.")
     args = parser.parse_args()
     # basic logging that matches logrus format
     fmt_string = "%(levelname)s %(message)-20s"
@@ -217,7 +228,8 @@ def main():
     hdlr.setFormatter(fmtr)
     logger.addHandler(hdlr)
     # Check for a rethinkcli image
-    check_for_rethinkcli()
+    if not args.no_image_check:
+        check_for_rethinkcli()
     # Run probe/clean functions
     probe()
     clean_result = clean()
